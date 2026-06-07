@@ -5,9 +5,17 @@ PowerMonitor is a macOS application for monitoring power usage and controlling f
 ## Screenshots
 
 <div align="center">
-  <img src="screenshots/fan_control.png" alt="Fan Control" width="350">
-  <img src="screenshots/menu_bar.png" alt="Menu Bar" width="350">
-  <img src="screenshots/network_overlay.png" alt="Network Overlay" width="350">
+  <table>
+    <tr>
+      <td valign="top">
+        <img src="screenshots/fan_control.png" alt="Fan Control" width="350">
+      </td>
+      <td valign="top">
+        <img src="screenshots/network_overlay.png" alt="Network Overlay" width="350"><br><br>
+        <img src="screenshots/menu_bar.png" alt="Menu Bar" width="350">
+      </td>
+    </tr>
+  </table>
 </div>
 
 ## Build Instructions
