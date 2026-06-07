@@ -1,3 +1,5 @@
+[English](README.md) | [中文](README_zh.md)
+
 # PowerMonitor
 
 PowerMonitor is a macOS application for monitoring power usage and controlling fans.
@@ -21,6 +23,18 @@ PowerMonitor is a macOS application for monitoring power usage and controlling f
     </tr>
   </table>
 </div>
+
+## Installation & Running
+
+Since the provided releases are not signed with a paid Apple Developer certificate (they are ad-hoc signed), macOS Gatekeeper may mark the app as "damaged" and refuse to open it when you download it from the internet.
+
+To resolve this, you need to clear the quarantine attribute. After extracting the app and moving it to your `Applications` folder, open your Terminal and run:
+
+```bash
+sudo xattr -cr /Applications/PowerMonitor.app
+```
+
+After running this command, you can double-click the application to launch it normally.
 
 ## Build Instructions
 
