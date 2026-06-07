@@ -2,6 +2,13 @@
 
 PowerMonitor is a macOS application for monitoring power usage and controlling fans.
 
+## Screenshots
+
+<div align="center">
+  <img src="screenshots/fan_control.png" alt="Fan Control" width="350">
+  <img src="screenshots/menu_bar.png" alt="Menu Bar" width="350">
+</div>
+
 ## Build Instructions
 
 Before building the project in Xcode, you must compile the `PowerMonitorFanHelper` binary, which is responsible for the fan control capabilities.
