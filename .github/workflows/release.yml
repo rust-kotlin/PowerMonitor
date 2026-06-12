@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build macOS Application
+    runs-on: macos-14
+    strategy:
+      matrix:
+        branch: [main, macos27]
+    
+    steps:
+      - name: Checkout Code (${{ matrix.branch }})
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Compile FanHelper
+        run: |
+          swiftc PowerMonitor/Resources/FanHelperSource.txt -o PowerMonitor/Resources/PowerMonitorFanHelper
+
+      - name: Build Xcode Project
+        run: |
+          xcodebuild -project PowerMonitor.xcodeproj \
+            -scheme PowerMonitor \
+            -configuration Release \
+            clean build \
+            CONFIGURATION_BUILD_DIR=build/Release
+
+      - name: Package App
+        shell: bash
+        run: |
+          set -eu
+          VERSION="${GITHUB_REF_NAME:-dev}"
+          STAGE="PowerMonitor-${VERSION}"
+          
+          if [ "${{ matrix.branch }}" == "macos27" ]; then
+            STAGE="${STAGE}-macos27"
+          fi
+          
+          APP_PATH="build/Release/PowerMonitor.app"
+          
+          # Re-sign the app bundle
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign --verify --verbose "$APP_PATH"
+
+          # Package using ditto to preserve attributes
+          ditto -c -k --keepParent "$APP_PATH" "${STAGE}.zip"
+          echo "ASSET=${STAGE}.zip" >> "$GITHUB_ENV"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PowerMonitor-${{ matrix.branch }}
+          path: ${{ env.ASSET }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.zip
+          fail_on_unmatched_files: true
+          body: |
+            # PowerMonitor 1.0
+
+            PowerMonitor is a macOS application for monitoring power usage and controlling fans.
+            适用于 macOS 的硬件状态监控与风扇控制应用。
+
+            - **Requirement / 系统要求**: macOS 14.0 or later
+
+            > **🚨 注意 / Notice for macOS 27 Beta users**
+            > 苹果在 macOS 27 测试版中修改了底层的右键菜单事件拦截机制，导致普通版本的右键菜单失效。**如果您使用的是 macOS 27 测试版，请务必下载带有 `-macos27` 后缀的版本。**
+            > If you are on macOS 27 Beta where the status bar right-click is broken, please download the version with the `-macos27` suffix.
+
+            ## 📥 Installation Guide / 安装指南
+
+            Since the app uses ad-hoc signing, macOS may warn that the app is "damaged" upon first launch. Please follow these exact steps to resolve it.
+            由于应用采用本地签名，初次下载后如果提示“App 已损坏，无法打开”，请按照以下步骤操作：
+
+            1. **Extract / 解压**
+               Double-click the downloaded `PowerMonitor.zip` to extract it.
+               双击下载的 `PowerMonitor.zip` 进行解压。
+
+            2. **Move / 移动**
+               Drag the extracted `PowerMonitor.app` into your **Applications** folder.
+               将解压出的 `PowerMonitor.app` 拖入 **应用程序 (Applications)** 文件夹。
+
+            3. **Unlock / 终端解锁**
+               Open the **Terminal** app, copy and run the following command (it may ask for your Mac password):
+               打开 Mac 自带的 **终端 (Terminal)** 软件，复制并运行以下命令（可能会要求输入开机密码）：
+
+               ```bash
+               sudo xattr -cr /Applications/PowerMonitor.app
+               ```
+
+            4. **Run / 运行**
+               Once the command finishes, you can double-click the app in your Applications folder to launch it normally.
+               命令执行完毕后，去“应用程序”中双击即可正常打开应用。
