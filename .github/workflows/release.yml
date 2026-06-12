@@ -24,7 +24,8 @@ jobs:
 
       - name: Compile FanHelper
         run: |
-          swiftc PowerMonitor/Resources/FanHelperSource.txt -o PowerMonitor/Resources/PowerMonitorFanHelper
+          cp PowerMonitor/Resources/FanHelperSource.txt FanHelperSource.swift
+          swiftc FanHelperSource.swift -o PowerMonitor/Resources/PowerMonitorFanHelper
 
       - name: Build Xcode Project
         run: |
