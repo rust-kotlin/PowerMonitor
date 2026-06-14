@@ -6,6 +6,7 @@ import Combine
 struct MenuBarMainView: View {
     @ObservedObject var monitor: SystemMonitor
     var onBlockClick: (MonitorMetric, CGRect?) -> Void
+    var onFramesUpdate: (([MonitorMetric: CGRect]) -> Void)? = nil
 
     @State private var blockFrames: [MonitorMetric: CGRect] = [:]
 
@@ -23,30 +24,27 @@ struct MenuBarMainView: View {
                             Divider().frame(height: 12).opacity(0.3)
                         }
 
-                        Button {
-                            onBlockClick(metric, blockFrames[metric])
-                        } label: {
-                            MenuBarBlockView(
-                                title: metric.shortTitle,
-                                value: valueText(for: metric),
-                                valueColor: monitor.useColoredValues ? colorFor(metric: metric) : nil,
-                                width: metric == .fan ? 38 : (metric == .disk ? 36 : 32)
-                            )
-                            .background(GeometryReader { geo in
-                                Color.clear
-                                    .onAppear {
-                                        DispatchQueue.main.async {
-                                            blockFrames[metric] = geo.frame(in: .named("menuHostingSpace"))
-                                        }
+                        MenuBarBlockView(
+                            title: metric.shortTitle,
+                            value: valueText(for: metric),
+                            valueColor: monitor.useColoredValues ? colorFor(metric: metric) : nil,
+                            width: metric == .fan ? 38 : (metric == .disk ? 36 : 32)
+                        )
+                        .background(GeometryReader { geo in
+                            Color.clear
+                                .onAppear {
+                                    DispatchQueue.main.async {
+                                        blockFrames[metric] = geo.frame(in: .named("menuHostingSpace"))
+                                        onFramesUpdate?(blockFrames)
                                     }
-                                    .onChange(of: geo.frame(in: .named("menuHostingSpace"))) { _, newValue in
-                                        DispatchQueue.main.async {
-                                            blockFrames[metric] = newValue
-                                        }
+                                }
+                                .onChange(of: geo.frame(in: .named("menuHostingSpace"))) { _, newValue in
+                                    DispatchQueue.main.async {
+                                        blockFrames[metric] = newValue
+                                        onFramesUpdate?(blockFrames)
                                     }
-                            })
-                        }
-                        .buttonStyle(.plain)
+                                }
+                        })
                     }
                 }
             } else {

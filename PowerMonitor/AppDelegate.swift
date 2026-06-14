@@ -14,18 +14,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let stressTester = StressTestController()
 
     private var eventMonitor: Any?
+    private var globalRightClickMonitor: Any?
+    private var localRightClickMonitor: Any?
     private var overlayMoveObserver: NSObjectProtocol?
     private var cancellables = Set<AnyCancellable>()
     private var currentMetric: MonitorMetric?
+    private var metricFrames: [MonitorMetric: CGRect] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            let menuView = MenuBarMainView(monitor: monitor) { [weak self] metric, blockRect in
+            let menuView = MenuBarMainView(monitor: monitor, onBlockClick: { [weak self] metric, blockRect in
                 self?.togglePopover(metric: metric, sender: button, blockRect: blockRect)
-            }
+            }, onFramesUpdate: { [weak self] frames in
+                self?.metricFrames = frames
+            })
 
             let hostingView = NSHostingView(rootView: menuView)
             hostingView.translatesAutoresizingMaskIntoConstraints = false
@@ -140,6 +145,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if self.popover.isShown {
                 self.popover.close()
             }
+        }
+        
+        setupMacos27RightClickFix()
+    }
+
+    private func setupMacos27RightClickFix() {
+        let mask: NSEvent.EventTypeMask = [.rightMouseDown]
+        
+        globalRightClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
+            self?.handleMacos27RightClick()
+        }
+        
+        localRightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            self?.handleMacos27RightClick()
+            return event
+        }
+    }
+
+    private func handleMacos27RightClick() {
+        guard let button = statusItem?.button, let window = button.window else { return }
+        
+        let mouseLocation = NSEvent.mouseLocation
+        let windowFrame = window.frame
+        
+        if windowFrame.contains(mouseLocation) {
+            rebuildStatusMenu()
+            NSApp.activate(ignoringOtherApps: true)
+            let menuPoint = NSPoint(x: button.bounds.midX, y: button.bounds.maxY)
+            statusMenu?.popUp(positioning: nil, at: menuPoint, in: button)
         }
     }
 
@@ -566,6 +600,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func statusButtonClicked(_ sender: NSStatusBarButton) {
+        // macOS 27 right-click is handled by global/local monitors.
+        // Fallback for macOS <= 26 if rightMouseUp still reaches here:
         if let event = NSApp.currentEvent, event.type == .rightMouseUp {
             if let button = statusItem?.button {
                 rebuildStatusMenu()
@@ -574,8 +610,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 statusMenu?.popUp(positioning: nil, at: menuPoint, in: button)
             }
         } else if let button = statusItem?.button {
-            let fallbackMetric = monitor.orderedVisibleMetrics.first ?? .cpu
-            togglePopover(metric: currentMetric ?? fallbackMetric, sender: button, blockRect: nil)
+            var clickedMetric: MonitorMetric? = nil
+            var clickedRect: CGRect? = nil
+            
+            if let window = button.window {
+                let globalMouse = NSEvent.mouseLocation
+                let locationInWindow = window.convertPoint(fromScreen: globalMouse)
+                let locationInButton = button.convert(locationInWindow, from: nil)
+                
+                for (metric, frame) in metricFrames {
+                    // Only check X coordinate because Y axis is inverted
+                    // SwiftUI menuHostingSpace X perfectly aligns with button X
+                    if locationInButton.x >= frame.minX && locationInButton.x <= frame.maxX {
+                        clickedMetric = metric
+                        clickedRect = frame
+                        break
+                    }
+                }
+            }
+            
+            let finalMetric = clickedMetric ?? currentMetric ?? monitor.orderedVisibleMetrics.first ?? .cpu
+            togglePopover(metric: finalMetric, sender: button, blockRect: clickedRect)
         }
     }
 
